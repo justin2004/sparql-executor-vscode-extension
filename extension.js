@@ -22,6 +22,7 @@ const AUTH_TYPE = {
 const OUTPUT = {
   JSON: 'json',
   TABLE: 'table',
+  RAW: 'raw',
 }
 
 const COMMAND = {
@@ -225,8 +226,12 @@ const executeSparqlQuery = async (context) => {
 
   if (output === OUTPUT.TABLE) {
     renderAsTable(values, context)
-  } else {
+  } else if (output === OUTPUT.JSON) {
     renderAsJson(values)
+  } else {
+      const outputChannel = vscode.window.createOutputChannel(`SPARQL Results`)
+      outputChannel.append(results)
+      outputChannel.show(true)
   }
 }
 
