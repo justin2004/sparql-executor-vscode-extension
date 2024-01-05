@@ -118,21 +118,21 @@ const renderAsJson = (results) => {
   outputChannel.show(true)
 }
 
-const getRequestPostOptions = (url, queryParameterName) => {
+const getRequestPostOptions = (url, queryParameterName, acceptMime) => {
   const query = vscode.window.activeTextEditor.document.getText()
 
   return {
     method: 'POST',
     url,
     headers: {
-      Accept: SPARQL_RESULTS_MIME_TYPE,
+      Accept: acceptMime || SPARQL_RESULTS_MIME_TYPE,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     form: { [queryParameterName]: query },
   }
 }
 
-const getRequestGetOptions = (url, queryParameterName) => {
+const getRequestGetOptions = (url, queryParameterName, acceptMime) => {
   const query = encodeURIComponent(vscode.window.activeTextEditor.document.getText())
   const fullRequestUrl = _.includes(url, '?') ? `${url}&${queryParameterName}=${query}` : `${url}?${queryParameterName}=${query}`
 
@@ -140,7 +140,7 @@ const getRequestGetOptions = (url, queryParameterName) => {
     method: 'GET',
     url: fullRequestUrl,
     headers: {
-      Accept: SPARQL_RESULTS_MIME_TYPE,
+      Accept: acceptMime || SPARQL_RESULTS_MIME_TYPE,
     },
   }
 }
@@ -165,6 +165,7 @@ const executeSparqlQuery = async (context) => {
     queryParameterName,
     customHeaders,
     output,
+    acceptMime,
     authentication: { type, username, password } = {},
   } = endpointConfiguration
   const query = vscode.window.activeTextEditor.document.getText()
@@ -178,8 +179,8 @@ const executeSparqlQuery = async (context) => {
   const url = `${protocol}://${host}/${(path || DEFAULT_SPARQL_PATH).replace(/^\//, '')}`
   const options =
     method === 'GET'
-      ? getRequestGetOptions(url, queryParameterName || queryType)
-      : getRequestPostOptions(url, queryParameterName || queryType)
+      ? getRequestGetOptions(url, queryParameterName || queryType, acceptMime)
+      : getRequestPostOptions(url, queryParameterName || queryType, acceptMime)
 
   // Add custom headers.
   if (_.isArray(customHeaders)) {
@@ -196,9 +197,10 @@ const executeSparqlQuery = async (context) => {
   vscode.window.setStatusBarMessage('Executing SPARQL query...')
 
   let responseJson
+  let response
 
   try {
-    responseJson = await request(options)
+    responseJson = await request(options) // TODO this is not necessairly json
   } catch (error) {
     vscode.window.showErrorMessage(`Something went wrong when executing the SPARQL query: '${error}'`)
     return
@@ -206,7 +208,20 @@ const executeSparqlQuery = async (context) => {
     vscode.window.setStatusBarMessage(undefined)
   }
 
-  const response = JSON.parse(responseJson)
+  try {
+    response = JSON.parse(responseJson)
+  } catch (error) {
+    // didn't get json
+    const outputChannelZ = vscode.window.createOutputChannel(`SPARQL Construct Results`)
+    outputChannelZ.append(responseJson)
+    outputChannelZ.show(true)
+    return
+  } finally {
+    // vscode.window.setStatusBarMessage(undefined)
+  }
+
+  // we got json
+
   const values = []
 
   if (!response || !response.results || !response.results.bindings || !response.results.bindings.length) {
@@ -230,7 +245,7 @@ const executeSparqlQuery = async (context) => {
     renderAsJson(values)
   } else {
       const outputChannel = vscode.window.createOutputChannel(`SPARQL Results`)
-      outputChannel.append(results)
+      outputChannel.append(values)
       outputChannel.show(true)
   }
 }

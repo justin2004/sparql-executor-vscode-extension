@@ -94,7 +94,8 @@
 								"description": "SPARQL results output format, defaults to 'json'",
 								"enum": [
 									"json",
-									"table"
+									"table",
+                                    "raw"
 								]
 							},
 							"customHeaders": {
